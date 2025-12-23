@@ -1,0 +1,77 @@
+# Git Commit Message Rules
+
+## 🚨 CRITICAL: Commit Message Language
+
+**ALL commit messages MUST be written in KOREAN (한글), not English.**
+
+When generating commit messages:
+- Write the `<subject>` in KOREAN
+- Write the `<body>` in KOREAN  
+- Keep `<type>` and `<scope>` in English (e.g., feat, fix, docs)
+- The description after the colon must be in KOREAN
+
+## Format
+
+```
+<type>(<scope>): <한글로 작성된 제목>
+
+<한글로 작성된 본문>
+
+<footer>
+```
+
+## Examples
+
+✅ CORRECT:
+```
+feat(products): 상품 검색 기능 추가
+fix(auth): 로그인 버튼 클릭 오류 수정
+docs(readme): 설치 가이드 업데이트
+refactor(api): 상품 API 에러 처리 개선
+chore(deps): 패키지 의존성 업데이트
+```
+
+❌ INCORRECT:
+```
+feat(products): add product search functionality
+fix(auth): resolve login button click issue
+docs(readme): update installation guide
+```
+
+## Commit Types
+
+- **feat**: 새로운 기능 추가
+- **fix**: 버그 수정
+- **docs**: 문서 작업
+- **style**: 코드 스타일 수정
+- **refactor**: 코드 리팩토링
+- **test**: 테스트 코드 추가/수정
+- **chore**: 빌드 설정, 패키지 업데이트 등
+
+## Detailed Examples with Body
+
+```
+feat(market-prices): 시장 가격 조회 API 추가
+
+사용자가 실시간 시장 가격을 조회할 수 있도록
+KAMIS API와 AT API를 통합한 기능을 구현했습니다.
+
+- KAMIS API 연동
+- AT API 연동
+- 에러 처리 및 로깅 추가
+
+Closes #123
+```
+
+```
+fix(orders): 주문 상세 페이지 로딩 오류 수정
+
+주문 ID가 없을 때 발생하는 에러를 처리하고
+사용자에게 적절한 메시지를 표시하도록 개선했습니다.
+```
+
+---
+
+**REMEMBER: Always use KOREAN for commit message descriptions!**
+**기억하세요: 커밋 메시지 설명은 항상 한글로 작성해야 합니다!**
+

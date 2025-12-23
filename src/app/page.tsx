@@ -1,103 +1,81 @@
-import Image from "next/image";
+import Link from 'next/link';
+
+const tools = [
+  {
+    name: '광고 성과 계산',
+    description: '여러 상품의 광고 성과를 비교하고 최적의 상품을 찾아보세요',
+    href: '/tools/ad-performance',
+    icon: '📊',
+  },
+  {
+    name: '키워드 분석',
+    description: '키워드의 검색량, 경쟁도, CPC를 분석하여 최적의 키워드를 찾아보세요',
+    href: '/tools/keyword-analysis',
+    icon: '🔍',
+  },
+  {
+    name: 'ROI 계산기',
+    description: '투자 대비 수익률을 계산하여 광고 효과를 측정하세요',
+    href: '/tools/roi-calculator',
+    icon: '💰',
+  },
+  {
+    name: '손익분기점 계산기',
+    description: '고정비와 변동비를 기반으로 손익분기점을 계산하여 최소 판매 목표를 설정하세요',
+    href: '/tools/break-even-point',
+    icon: '📊',
+  },
+  {
+    name: '광고 예산 계산기',
+    description: '목표 전환수와 CPC를 기반으로 필요한 광고 예산을 계산하세요',
+    href: '/tools/budget-calculator',
+    icon: '💵',
+  },
+  {
+    name: 'CRO 전환율 최적화 계산기',
+    description: '전환율 개선에 따른 월간/연간 예상 매출 증가액과 추가 확보 전환수를 계산하세요',
+    href: '/tools/conversion-calculator',
+    icon: '📈',
+  },
+  {
+    name: '마케팅 수익성 진단',
+    description: '목표 CPA, LTV, LTV:CAC 비율을 3단계로 진단하여 광고 예산을 최적화하세요',
+    href: '/tools/profitability-diagnosis',
+    icon: '📊',
+  },
+];
 
 export default function Home() {
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+    <div className="min-h-screen bg-background">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="text-center mb-12">
+          <h1 className="text-4xl font-bold mb-4 text-foreground">
+            마케팅 도구 모음
+          </h1>
+          <p className="text-lg text-gray-600 dark:text-gray-400">
+            다양한 마케팅 도구를 활용하여 광고 성과를 최적화하세요
+          </p>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {tools.map((tool) => (
+            <Link
+              key={tool.name}
+              href={tool.href}
+              className="block bg-white dark:bg-gray-900 rounded-lg shadow-lg p-6 hover:shadow-xl transition-shadow border border-gray-200 dark:border-gray-800"
+            >
+              <div className="text-4xl mb-4">{tool.icon}</div>
+              <h2 className="text-xl font-semibold mb-2 text-foreground">
+                {tool.name}
+              </h2>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                {tool.description}
+              </p>
+            </Link>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
