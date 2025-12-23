@@ -7,9 +7,8 @@ import React, { ReactNode } from 'react';
  *
  * 기본 카드 컴포넌트의 Props 인터페이스입니다.
  */
-interface CardBaseProps {
+interface CardBaseProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'onClick' | 'children'> {
   children: ReactNode;
-  className?: string;
   onClick?: () => void;
   disabled?: boolean;
   padding?: 'sm' | 'md' | 'lg';
@@ -104,6 +103,8 @@ const Card = React.forwardRef<HTMLDivElement, CardProps>(
     // 상태 카드 처리
     if (isStatusCard) {
       const statusProps = props as StatusCardProps;
+      // variant, status, icon, label을 제외한 HTML 속성 추출
+      const { variant: _, status: __, icon: ___, label: ____, ...htmlProps } = statusProps;
       const statusConfig = {
         pending: {
           borderColor: '#FBBF24',
@@ -140,6 +141,7 @@ const Card = React.forwardRef<HTMLDivElement, CardProps>(
       return (
         <div
           ref={ref}
+          {...htmlProps}
           className={`
             rounded-2xl
             shadow-md dark:shadow-gray-900/50
@@ -151,10 +153,11 @@ const Card = React.forwardRef<HTMLDivElement, CardProps>(
             borderLeft: `4px solid ${statusConfig.borderColor}`,
             backgroundColor: statusConfig.bgColor,
             color: statusConfig.textColor,
+            ...htmlProps.style,
           }}
           onClick={!disabled ? onClick : undefined}
-          role={onClick ? 'button' : undefined}
-          aria-label={ariaLabel || statusProps.label || statusConfig.label}
+          role={htmlProps.role || (onClick ? 'button' : undefined)}
+          aria-label={ariaLabel || statusProps.label || statusConfig.label || htmlProps['aria-label']}
           aria-disabled={disabled}
           tabIndex={!disabled && onClick ? 0 : undefined}
           onKeyPress={(e) => {
@@ -181,7 +184,10 @@ const Card = React.forwardRef<HTMLDivElement, CardProps>(
 
     // 3D 효과 카드 처리
     if (is3DCard) {
-      const intensity = (props as Card3DProps).intensity || 'normal';
+      const card3DProps = props as Card3DProps;
+      const intensity = card3DProps.intensity || 'normal';
+      // variant, intensity를 제외한 HTML 속성 추출
+      const { variant: _, intensity: __, ...htmlProps } = card3DProps;
       const shadowValue =
         intensity === 'strong'
           ? '0 30px 60px rgba(16, 185, 129, 0.2)'
@@ -194,6 +200,7 @@ const Card = React.forwardRef<HTMLDivElement, CardProps>(
       return (
         <div
           ref={ref}
+          {...htmlProps}
           className={`
             rounded-3xl
             ${hoverable && !disabled ? 'hover:-translate-y-2' : ''}
@@ -204,10 +211,11 @@ const Card = React.forwardRef<HTMLDivElement, CardProps>(
             ...(hoverable && !disabled && {
               '--hover-shadow': hoverShadowValue,
             } as React.CSSProperties),
+            ...htmlProps.style,
           }}
           onClick={!disabled ? onClick : undefined}
-          role={onClick ? 'button' : undefined}
-          aria-label={ariaLabel}
+          role={htmlProps.role || (onClick ? 'button' : undefined)}
+          aria-label={ariaLabel || htmlProps['aria-label']}
           aria-disabled={disabled}
           tabIndex={!disabled && onClick ? 0 : undefined}
           onKeyPress={(e) => {
@@ -233,9 +241,12 @@ const Card = React.forwardRef<HTMLDivElement, CardProps>(
     }
 
     // 기본 카드 처리
+    // variant를 제외한 HTML 속성 추출
+    const { variant: _, ...htmlProps } = props as BasicCardProps;
     return (
       <div
         ref={ref}
+        {...htmlProps}
         className={`
           rounded-2xl
           shadow-md dark:shadow-gray-900/50
@@ -244,8 +255,8 @@ const Card = React.forwardRef<HTMLDivElement, CardProps>(
           ${baseClasses}
         `}
         onClick={!disabled ? onClick : undefined}
-        role={onClick ? 'button' : undefined}
-        aria-label={ariaLabel}
+        role={htmlProps.role || (onClick ? 'button' : undefined)}
+        aria-label={ariaLabel || htmlProps['aria-label']}
         aria-disabled={disabled}
         tabIndex={!disabled && onClick ? 0 : undefined}
         onKeyPress={(e) => {
