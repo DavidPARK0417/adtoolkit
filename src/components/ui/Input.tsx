@@ -42,7 +42,7 @@ Label.displayName = 'Label';
 /**
  * Input Component Props
  */
-interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'size'> {
   size?: 'sm' | 'md' | 'lg';
   error?: boolean;
   errorMessage?: string;
