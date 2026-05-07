@@ -649,13 +649,17 @@ export default function TagCopySection({
       ) as HTMLDivElement;
 
       // ──────────────────────────────────────────────────
-      // ⭐ [핵심] 네이버 스마트에디터용 이미지 URL 처리
+      // ⭐ [근본 해결책] 네이버 블로그 이미지 영구 URL 처리
       //
-      // 네이버 스마트에디터 ONE 이미지 처리 규칙:
-      //  - data:image/... (Base64) → ❌ "허용되지 않는 형식" 오류로 차단
-      //  - https://... (외부 URL) → ✅ 네이버가 자동 다운로드 후 자체 CDN 재업로드
+      // 문제:
+      //  - 외부 URL 그대로 → 시간이 지나면 토큰 만료 / Referer 차단으로 이미지 깨짐
+      //  - Base64(data:image/...) → 네이버 스마트에디터에서 "허용되지 않는 형식" 오류
       //
-      // 따라서: 프록시 URL에서 원본 CDN URL을 추출해 절대 HTTPS URL로 변환합니다.
+      // 해결책:
+      //  - /api/upload-naver-image 로 이미지를 전송
+      //  - 서버에서 Supabase Storage(product-images 버킷)에 영구 저장
+      //  - 반환된 영구 공개 URL로 img src 교체
+      //  - 이 URL은 만료되지 않으므로 네이버 블로그에서도 영원히 표시됨
       // ──────────────────────────────────────────────────
       const imagesN = Array.from(contentCloneN.querySelectorAll("img"));
 
@@ -669,24 +673,45 @@ export default function TagCopySection({
         const srcUrl = img.getAttribute("src");
         if (!srcUrl) continue;
 
-        let finalUrl = srcUrl;
-
+        // 원본 URL 추출 (프록시를 통하는 경우 원본 URL 복원)
+        let originalUrl = srcUrl;
         if (srcUrl.includes("/api/proxy-image")) {
-          // 프록시 URL에서 원본 URL 추출 (예: /api/proxy-image?url=https%3A%2F%2F...)
           const urlMatch = srcUrl.match(/url=([^&]+)/);
-          if (urlMatch) {
-            finalUrl = decodeURIComponent(urlMatch[1]);
-          }
+          if (urlMatch) originalUrl = decodeURIComponent(urlMatch[1]);
         } else if (srcUrl.startsWith("/")) {
-          // 상대 경로 → baseUrl 붙여 절대 경로로 변환
-          finalUrl = baseUrl + srcUrl;
+          originalUrl = baseUrl + srcUrl;
         }
-        // 이미 http(s)://로 시작하면 그대로 사용
 
-        // avif / webp → jpg 확장자 변환 (호환성 향상)
-        finalUrl = finalUrl.replace(/\.(avif|webp)(?=\?|$)/i, ".jpg");
+        try {
+          // 서버사이드 영구 업로드 API 호출
+          const uploadRes = await fetch("/api/upload-naver-image", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ imageUrl: originalUrl }),
+          });
 
-        img.setAttribute("src", finalUrl);
+          if (uploadRes.ok) {
+            const { permanentUrl } = (await uploadRes.json()) as {
+              permanentUrl: string;
+            };
+            img.setAttribute("src", permanentUrl);
+          } else {
+            // 업로드 실패 시 fallback: 원본 URL (avif/webp → jpg)
+            const fallback = originalUrl.replace(
+              /\.(avif|webp)(?=\?|$)/i,
+              ".jpg",
+            );
+            img.setAttribute("src", fallback);
+          }
+        } catch (err) {
+          console.error("이미지 영구 업로드 실패 (네이버용):", err);
+          // 네트워크 오류 등 fallback
+          const fallback = originalUrl.replace(
+            /\.(avif|webp)(?=\?|$)/i,
+            ".jpg",
+          );
+          img.setAttribute("src", fallback);
+        }
       }
 
       // 테이블 스타일링 (클론 DOM 조작)
