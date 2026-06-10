@@ -55,7 +55,7 @@ export default function InsightProductTags({
         type="button"
         onClick={() =>
           copyToClipboard(
-            `<div style="text-align: center;" align="center"><span style="color: #777777;"><i>"이 포스팅은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다."</i></span></div>`,
+            `<div style="text-align: center;" align="center"><span style="color: #ff9800;"><i>"이 포스팅은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다."</i></span></div>`,
             `*"이 포스팅은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다."*`,
             "header",
           )

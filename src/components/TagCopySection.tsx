@@ -578,22 +578,23 @@ export default function TagCopySection({
       let disclaimerText = "";
 
       if (products && products.length > 0) {
-        disclaimerHtml = `<br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><div style="text-align: center;" align="center"><span style="color: #777777;"><i>"이 포스팅은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다."</i></span></div>`;
-        disclaimerText = `\n\n*"이 포스팅은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다."*`;
+        disclaimerHtml = `<div style="text-align: center; margin-bottom: 20px;" align="center"><span style="color: #ff9800;"><i>"이 포스팅은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다."</i></span></div>`;
+        disclaimerText = `*"이 포스팅은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다."*\n\n`;
       }
 
       // 전체 결합
       const combinedHtml = `
         <div style="font-family: 'NanumGothic', 'Malgun Gothic', sans-serif; font-size: 17px; color: #333333; line-height: 1.8; padding: 20px; max-width: 800px; margin: 0 auto;">
+          ${disclaimerHtml}
           ${summaryHtml}
           <div style="margin-top: 40px;">
             ${bodyHtml}
           </div>
-          ${disclaimerHtml}
+          <br /><br /><br /><br /><br /><br /><br />
         </div>
       `;
 
-      plainTextCombined = `${summaryText}\n\n${contentRef.current.innerText}${disclaimerText}`;
+      plainTextCombined = `${disclaimerText}${summaryText}\n\n${contentRef.current.innerText}\n\n\n\n\n\n\n`;
 
       const blobHtml = new Blob([combinedHtml], { type: "text/html" });
       const blobText = new Blob([plainTextCombined], { type: "text/plain" });
