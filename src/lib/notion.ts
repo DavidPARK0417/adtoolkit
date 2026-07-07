@@ -38,8 +38,14 @@ interface NotionPage {
     blogPost?: { rich_text: NotionRichText[] };
     category?: { rich_text: NotionRichText[] };
     date?: { date: { start: string } | null };
-    tags?: { multi_select: { name: string; color?: string }[] };
-    products?: { multi_select: { name: string; color?: string }[] };
+    tags?: {
+      multi_select?: { name: string; color?: string }[];
+      rich_text?: NotionRichText[];
+    };
+    products?: {
+      multi_select?: { name: string; color?: string }[];
+      rich_text?: NotionRichText[];
+    };
     prompt1?: { rich_text: NotionRichText[] };
     prompt2?: { rich_text: NotionRichText[] };
     prompt3?: { rich_text: NotionRichText[] };
@@ -587,8 +593,56 @@ export async function mapNotionPageToPost(
     blogPost: blogPostContent,
     category: p.category?.rich_text?.[0]?.plain_text || undefined,
     date: p.date?.date?.start || undefined,
-    tags: p.tags?.multi_select?.map((tag) => tag.name) || undefined,
-    products: p.products?.multi_select?.map((item) => item.name) || undefined,
+    tags: (() => {
+      if (p.tags?.multi_select && p.tags.multi_select.length > 0) {
+        return p.tags.multi_select.map((tag) => tag.name);
+      }
+      if (p.tags?.rich_text && p.tags.rich_text.length > 0) {
+        const text = p.tags.rich_text
+          .map((rt: NotionRichText) => rt.plain_text)
+          .join("");
+        if (!text.trim()) return undefined;
+        let arr: string[] = [];
+        if (text.includes(",")) {
+          arr = text
+            .split(",")
+            .map((t) => t.trim())
+            .filter(Boolean);
+        } else {
+          arr = text
+            .split(/\s+/)
+            .map((t) => t.trim())
+            .filter(Boolean);
+        }
+        return arr.map((t) => (t.startsWith("#") ? t.substring(1) : t));
+      }
+      return undefined;
+    })(),
+    products: (() => {
+      if (p.products?.multi_select && p.products.multi_select.length > 0) {
+        return p.products.multi_select.map((item) => item.name);
+      }
+      if (p.products?.rich_text && p.products.rich_text.length > 0) {
+        const text = p.products.rich_text
+          .map((rt: NotionRichText) => rt.plain_text)
+          .join("");
+        if (!text.trim()) return undefined;
+        let arr: string[] = [];
+        if (text.includes(",")) {
+          arr = text
+            .split(",")
+            .map((t) => t.trim())
+            .filter(Boolean);
+        } else {
+          arr = text
+            .split(/\s+/)
+            .map((t) => t.trim())
+            .filter(Boolean);
+        }
+        return arr.map((t) => (t.startsWith("#") ? t.substring(1) : t));
+      }
+      return undefined;
+    })(),
     featuredImage,
     prompt1: p.prompt1?.rich_text?.[0]?.plain_text || undefined,
     prompt2: p.prompt2?.rich_text?.[0]?.plain_text || undefined,

@@ -34,6 +34,45 @@ export default function TagCopySection({
   const [mounted, setMounted] = React.useState(false);
   const isProcessingRef = React.useRef(false); // 가공/복사 중복 방지용
 
+  // tags가 단일 문자열 "AI, 인공지능, 테크" 형태 등으로 들어올 수 있기 때문에,
+  // 이를 쉼표(,)나 공백( ) 기준으로 다시 쪼개어 각각의 태그 배열로 가공합니다.
+  const processedTags = React.useMemo(() => {
+    if (!tags || tags.length === 0) return [];
+
+    let result: string[] = [];
+    tags.forEach((tag) => {
+      if (!tag) return;
+
+      // 쉼표가 포함되어 있으면 쉼표 기준으로 분할
+      if (tag.includes(",")) {
+        result.push(
+          ...tag
+            .split(",")
+            .map((t) => t.trim())
+            .filter(Boolean),
+        );
+      }
+      // 공백이 포함되어 있고, '#'로 시작하지 않는 경우 (예: "AI 테크 트렌드") 공백 기준으로 분할
+      else if (tag.includes(" ") && !tag.trim().startsWith("#")) {
+        result.push(
+          ...tag
+            .split(/\s+/)
+            .map((t) => t.trim())
+            .filter(Boolean),
+        );
+      }
+      // 그 외에는 단순 추가
+      else {
+        result.push(tag.trim());
+      }
+    });
+
+    // 태그 앞의 # 기호가 있으면 제거하여 표준화 (렌더링 및 복사 시 유연하게 # 붙일 수 있도록)
+    return result
+      .filter(Boolean)
+      .map((tag) => (tag.startsWith("#") ? tag.substring(1) : tag));
+  }, [tags]);
+
   // ⭐ 같은 메뉴에서 공통으로 쓸 “랜덤 카피 제목” 저장용 상태
   const [menuDynamicTitle, setMenuDynamicTitle] = React.useState<string | null>(
     null,
@@ -189,15 +228,15 @@ export default function TagCopySection({
 
   // 태그1: # 없이 쉼표로 구분
   const handleCopyTag1 = () => {
-    if (!tags || tags.length === 0) return;
-    const copyText = tags.join(", ");
+    if (processedTags.length === 0) return;
+    const copyText = processedTags.join(", ");
     void copyToClipboard(copyText, "tag1");
   };
 
   // 태그2: # 포함, 공백으로 구분
   const handleCopyTag2 = () => {
-    if (!tags || tags.length === 0) return;
-    const copyText = tags.map((tag) => `#${tag}`).join(" ");
+    if (processedTags.length === 0) return;
+    const copyText = processedTags.map((tag) => `#${tag}`).join(" ");
     void copyToClipboard(copyText, "tag2");
   };
 
@@ -958,8 +997,8 @@ export default function TagCopySection({
 
       // 태그 생성 (태그N 방식: #태그1 #태그2 #태그3)
       const tagsHtml =
-        tags && tags.length > 0
-          ? `<div style="margin-top: 40px; color: #059669; font-size: 16px; font-family: 'NanumGothic', 'Malgun Gothic', sans-serif;">${tags.map((t) => `#${t}`).join(" ")}</div>`
+        processedTags.length > 0
+          ? `<div style="margin-top: 40px; color: #059669; font-size: 16px; font-family: 'NanumGothic', 'Malgun Gothic', sans-serif;">${processedTags.map((t) => `#${t}`).join(" ")}</div>`
           : "";
 
       // 전체 결합
@@ -974,9 +1013,16 @@ export default function TagCopySection({
         </div>
       `;
 
+      const tagsTextForPlain =
+        processedTags.length > 0
+          ? `\n\n${processedTags.map((t) => `#${t}`).join(" ")}`
+          : "";
+
       const blobHtml = new Blob([combinedHtml], { type: "text/html" });
       const blobText = new Blob(
-        [`${summaryText}\n\n${contentRef.current.innerText}`],
+        [
+          `${summaryText}\n\n${contentRef.current.innerText}${tagsTextForPlain}`,
+        ],
         { type: "text/plain" },
       );
 
@@ -999,7 +1045,11 @@ export default function TagCopySection({
     } catch (err) {
       console.error("네이버 본문 복사 실패:", err);
       // 모바일 등에서 ClipboardItem 미지원 시 텍스트만이라도 복사 시도
-      const plainText = `${descriptionRef.current?.innerText || ""}\n\n${contentRef.current?.innerText || ""}`;
+      const tagsTextForPlain =
+        processedTags.length > 0
+          ? `\n\n${processedTags.map((t) => `#${t}`).join(" ")}`
+          : "";
+      const plainText = `${descriptionRef.current?.innerText || ""}\n\n${contentRef.current?.innerText || ""}${tagsTextForPlain}`;
       void copyToClipboard(plainText, "htmlN");
     }
   };
@@ -1149,9 +1199,9 @@ export default function TagCopySection({
   return (
     <div className={containerClass}>
       <div className="flex flex-col gap-3 sm:gap-4">
-        {!onlyButtons && (
+        {!onlyButtons && processedTags.length > 0 && (
           <div className="flex flex-wrap gap-2 sm:gap-3">
-            {tags.map((tag, index) => (
+            {processedTags.map((tag, index) => (
               <span
                 key={`tag-${tag}-${index}`}
                 className="
