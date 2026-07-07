@@ -39,7 +39,7 @@ export default function TagCopySection({
   const processedTags = React.useMemo(() => {
     if (!tags || tags.length === 0) return [];
 
-    let result: string[] = [];
+    const result: string[] = [];
     tags.forEach((tag) => {
       if (!tag) return;
 

@@ -42,9 +42,15 @@ interface NotionPage {
     cookingtime?: unknown;
     image?: unknown;
     date?: { date: { start: string } | null };
-    tags?: { multi_select: { name: string; color?: string }[] };
+    tags?: {
+      multi_select?: { name: string; color?: string }[];
+      rich_text?: NotionRichText[];
+    };
     category?: { rich_text: NotionRichText[] };
-    products?: { multi_select: { name: string; color?: string }[] };
+    products?: {
+      multi_select?: { name: string; color?: string }[];
+      rich_text?: NotionRichText[];
+    };
     prompt?: { rich_text: NotionRichText[] };
     [key: string]: unknown;
   };
@@ -87,6 +93,188 @@ export interface Recipe {
   image?: string; // image 속성도 지원
   products?: string[];
   prompt?: string;
+}
+
+/**
+ * NotionPage 객체를 Recipe 객체로 변환하는 공통 매핑 함수입니다.
+ * tags와 products를 multi_select 및 rich_text(텍스트) 양쪽 형태 모두 유연하게 매핑합니다.
+ */
+function mapNotionPageToRecipe(page: NotionPage, content?: string): Recipe {
+  const p = page.properties;
+
+  const blogPostContent =
+    content !== undefined
+      ? content
+      : p.blogPost?.rich_text
+        ? p.blogPost.rich_text
+            .map((rt: NotionRichText) => rt.plain_text)
+            .join("")
+        : "";
+
+  const description =
+    p.description?.rich_text?.[0]?.plain_text ||
+    p.metaDescription?.rich_text?.[0]?.plain_text ||
+    "";
+
+  let featuredImage: string | undefined = undefined;
+
+  if (
+    p.image &&
+    typeof p.image === "object" &&
+    p.image !== null &&
+    "files" in p.image &&
+    Array.isArray(p.image.files) &&
+    p.image.files.length > 0
+  ) {
+    const file = p.image.files[0];
+    if (file?.file?.url) {
+      featuredImage = file.file.url;
+    } else if (file?.external?.url) {
+      featuredImage = file.external.url;
+    }
+  } else if (
+    p.image &&
+    typeof p.image === "object" &&
+    p.image !== null &&
+    "url" in p.image &&
+    typeof p.image.url === "string"
+  ) {
+    featuredImage = p.image.url;
+  }
+
+  // featuredImage가 files/url 등 다이렉트 속성일 때 확인
+  if (!featuredImage && p.featuredImage) {
+    const fImg = p.featuredImage as
+      | {
+          type: "files";
+          files: Array<{
+            type: "external" | "file";
+            external?: { url: string };
+            file?: { url: string };
+          }>;
+        }
+      | { type: "url"; url: string }
+      | undefined;
+    if (fImg && typeof fImg === "object") {
+      if (
+        fImg.type === "files" &&
+        Array.isArray(fImg.files) &&
+        fImg.files.length > 0
+      ) {
+        const file = fImg.files[0];
+        featuredImage =
+          file.type === "external" ? file.external?.url : file.file?.url;
+      } else if (fImg.type === "url" && fImg.url) {
+        featuredImage = fImg.url;
+      }
+    }
+  }
+
+  if (!featuredImage) {
+    featuredImage = extractFirstImageUrl(blogPostContent);
+  }
+
+  const publishedValue = (p.published || p.Published) as
+    | { checkbox?: boolean }
+    | undefined;
+  const isPublished = publishedValue?.checkbox ?? true;
+  const difficulty = p.difficulty?.select?.name || undefined;
+
+  let cookingTime: string | number | undefined = undefined;
+  if (p.cookingtime && typeof p.cookingtime === "object") {
+    const ct = p.cookingtime as {
+      rich_text?: Array<{ plain_text: string }>;
+      number?: number;
+    };
+    if (ct.rich_text?.[0]?.plain_text) {
+      cookingTime = ct.rich_text[0].plain_text;
+    } else if (typeof ct.number === "number") {
+      cookingTime = ct.number;
+    }
+  }
+
+  let servingSize: number | undefined = undefined;
+  if (p.servingsize && typeof p.servingsize === "object") {
+    const ss = p.servingsize as { number?: number };
+    if (typeof ss.number === "number") {
+      servingSize = ss.number;
+    }
+  }
+
+  // 태그 매핑 (multi_select & rich_text 모두 지원)
+  const tags = (() => {
+    if (p.tags?.multi_select && p.tags.multi_select.length > 0) {
+      return p.tags.multi_select.map((tag) => tag.name);
+    }
+    if (p.tags?.rich_text && p.tags.rich_text.length > 0) {
+      const text = p.tags.rich_text
+        .map((rt: NotionRichText) => rt.plain_text)
+        .join("");
+      if (!text.trim()) return undefined;
+      let arr: string[] = [];
+      if (text.includes(",")) {
+        arr = text
+          .split(",")
+          .map((t) => t.trim())
+          .filter(Boolean);
+      } else {
+        arr = text
+          .split(/\s+/)
+          .map((t) => t.trim())
+          .filter(Boolean);
+      }
+      return arr.map((t) => (t.startsWith("#") ? t.substring(1) : t));
+    }
+    return undefined;
+  })();
+
+  // 상품 매핑 (multi_select & rich_text 모두 지원)
+  const products = (() => {
+    if (p.products?.multi_select && p.products.multi_select.length > 0) {
+      return p.products.multi_select.map((item) => item.name);
+    }
+    if (p.products?.rich_text && p.products.rich_text.length > 0) {
+      const text = p.products.rich_text
+        .map((rt: NotionRichText) => rt.plain_text)
+        .join("");
+      if (!text.trim()) return undefined;
+      let arr: string[] = [];
+      if (text.includes(",")) {
+        arr = text
+          .split(",")
+          .map((t) => t.trim())
+          .filter(Boolean);
+      } else {
+        arr = text
+          .split(/\s+/)
+          .map((t) => t.trim())
+          .filter(Boolean);
+      }
+      return arr.map((t) => (t.startsWith("#") ? t.substring(1) : t));
+    }
+    return undefined;
+  })();
+
+  return {
+    id: page.id,
+    title: p.title?.title?.[0]?.plain_text || "Untitled",
+    slug: p.slug?.rich_text?.[0]?.plain_text || "",
+    description,
+    metaDescription:
+      p.metaDescription?.rich_text?.[0]?.plain_text || description,
+    published: isPublished,
+    blogPost: blogPostContent || undefined,
+    difficulty,
+    cookingTime,
+    servingSize,
+    category: p.category?.rich_text?.[0]?.plain_text || undefined,
+    products,
+    prompt: p.prompt?.rich_text?.[0]?.plain_text || undefined,
+    date: p.date?.date?.start || undefined,
+    tags,
+    featuredImage,
+    image: featuredImage,
+  };
 }
 
 /**
@@ -542,103 +730,8 @@ export async function getPublishedRecipesPaginated(
     const pageResults = allResults.slice(targetStartIndex, targetEndIndex);
 
     // 1단계: 먼저 기본 정보만 빠르게 가져오기 (이미지 추출 없이)
-    const recipesWithoutImages: Recipe[] = pageResults.map(
-      (page: NotionPage) => {
-        const blogPostContent = page.properties.blogPost?.rich_text
-          ? page.properties.blogPost.rich_text
-              .map((rt: NotionRichText) => rt.plain_text)
-              .join("")
-          : "";
-
-        // description 또는 metaDescription 사용
-        const description =
-          page.properties.description?.rich_text?.[0]?.plain_text ||
-          page.properties.metaDescription?.rich_text?.[0]?.plain_text ||
-          "";
-
-        // image 속성에서 이미지 URL 추출 (빠른 방법)
-        let featuredImage: string | undefined = undefined;
-
-        // image 속성이 files 배열인 경우
-        if (
-          page.properties.image &&
-          typeof page.properties.image === "object" &&
-          page.properties.image !== null &&
-          "files" in page.properties.image &&
-          Array.isArray(page.properties.image.files)
-        ) {
-          const imageFile = page.properties.image.files[0];
-          if (imageFile?.file?.url) {
-            featuredImage = imageFile.file.url;
-          }
-        }
-        // image 속성이 url인 경우
-        else if (
-          page.properties.image &&
-          typeof page.properties.image === "object" &&
-          page.properties.image !== null &&
-          "url" in page.properties.image &&
-          typeof page.properties.image.url === "string"
-        ) {
-          featuredImage = page.properties.image.url;
-        }
-
-        // image 속성이 없으면 blogPost에서만 추출 (빠른 방법)
-        if (!featuredImage) {
-          featuredImage = extractFirstImageUrl(blogPostContent);
-        }
-
-        // published 속성 확인 (소문자 우선)
-        const publishedValue = (page.properties.published ||
-          page.properties.Published) as { checkbox?: boolean } | undefined;
-        const isPublished = publishedValue?.checkbox ?? true;
-
-        // difficulty 추출
-        const difficulty =
-          page.properties.difficulty?.select?.name || undefined;
-
-        // cookingtime 추출 (rich_text 또는 number)
-        let cookingTime: string | number | undefined = undefined;
-        if (
-          page.properties.cookingtime &&
-          typeof page.properties.cookingtime === "object" &&
-          page.properties.cookingtime !== null
-        ) {
-          if (
-            "rich_text" in page.properties.cookingtime &&
-            Array.isArray(page.properties.cookingtime.rich_text) &&
-            page.properties.cookingtime.rich_text?.[0]?.plain_text
-          ) {
-            cookingTime = page.properties.cookingtime.rich_text[0].plain_text;
-          } else if (
-            "number" in page.properties.cookingtime &&
-            typeof page.properties.cookingtime.number === "number"
-          ) {
-            cookingTime = page.properties.cookingtime.number;
-          }
-        }
-
-        return {
-          id: page.id,
-          title: page.properties.title?.title[0]?.plain_text || "Untitled",
-          slug: page.properties.slug?.rich_text?.[0]?.plain_text || "",
-          metaDescription: description,
-          description: description,
-          published: isPublished,
-          blogPost: blogPostContent || undefined,
-          difficulty,
-          cookingTime,
-          category:
-            page.properties.category?.rich_text?.[0]?.plain_text || undefined,
-          products:
-            page.properties.products?.multi_select?.map((p) => p.name) ||
-            undefined,
-          prompt:
-            page.properties.prompt?.rich_text?.[0]?.plain_text || undefined,
-          featuredImage, // 빠른 방법으로 추출한 이미지만 (없으면 undefined)
-          image: featuredImage,
-        };
-      },
+    const recipesWithoutImages: Recipe[] = pageResults.map((page: NotionPage) =>
+      mapNotionPageToRecipe(page),
     );
 
     // 2단계: 상단 2개 항목의 이미지를 먼저 가져오기 (우선순위)
@@ -765,91 +858,7 @@ export async function getLatestRecipes(limit: number = 3): Promise<Recipe[]> {
     }
 
     const recipesWithoutImages: Recipe[] = data.results.map(
-      (page: NotionPage) => {
-        const p = page.properties;
-        const blogPostContent = p.blogPost?.rich_text
-          ? p.blogPost.rich_text
-              .map((rt: NotionRichText) => rt.plain_text)
-              .join("")
-          : "";
-
-        const description =
-          p.description?.rich_text?.[0]?.plain_text ||
-          p.metaDescription?.rich_text?.[0]?.plain_text ||
-          "";
-
-        // image 속성에서 이미지 URL 추출 (빠른 방법)
-        let featuredImage: string | undefined = undefined;
-
-        // image 속성이 files 배열인 경우
-        if (
-          p.image &&
-          typeof p.image === "object" &&
-          p.image !== null &&
-          "files" in p.image &&
-          Array.isArray(p.image.files)
-        ) {
-          const imageFile = p.image.files[0];
-          if (imageFile?.file?.url) {
-            featuredImage = imageFile.file.url;
-          }
-        }
-        // image 속성이 url인 경우
-        else if (
-          p.image &&
-          typeof p.image === "object" &&
-          p.image !== null &&
-          "url" in p.image &&
-          typeof p.image.url === "string"
-        ) {
-          featuredImage = p.image.url;
-        }
-
-        // image 속성이 없으면 blogPost에서만 추출 (빠른 방법)
-        if (!featuredImage) {
-          featuredImage = extractFirstImageUrl(blogPostContent);
-        }
-
-        const publishedValue = (p.published || p.Published) as
-          | { checkbox?: boolean }
-          | undefined;
-        const isPublished = publishedValue?.checkbox ?? true;
-        const difficulty = p.difficulty?.select?.name || undefined;
-
-        let cookingTime: string | number | undefined = undefined;
-        if (p.cookingtime && typeof p.cookingtime === "object") {
-          const ct = p.cookingtime as {
-            rich_text?: Array<{ plain_text: string }>;
-            number?: number;
-          };
-          if (ct.rich_text?.[0]?.plain_text) {
-            cookingTime = ct.rich_text[0].plain_text;
-          } else if (typeof ct.number === "number") {
-            cookingTime = ct.number;
-          }
-        }
-
-        return {
-          id: page.id,
-          title: page.properties.title?.title[0]?.plain_text || "Untitled",
-          slug: page.properties.slug?.rich_text?.[0]?.plain_text || "",
-          metaDescription: description,
-          description: description,
-          published: isPublished,
-          blogPost: blogPostContent || undefined,
-          difficulty,
-          cookingTime,
-          category:
-            page.properties.category?.rich_text?.[0]?.plain_text || undefined,
-          products:
-            page.properties.products?.multi_select?.map((p) => p.name) ||
-            undefined,
-          prompt:
-            page.properties.prompt?.rich_text?.[0]?.plain_text || undefined,
-          featuredImage,
-          image: featuredImage,
-        };
-      },
+      (page: NotionPage) => mapNotionPageToRecipe(page),
     );
 
     const recipesWithImagesPromises = recipesWithoutImages.map(
@@ -960,109 +969,9 @@ export async function getAllPublishedRecipes(): Promise<Recipe[]> {
         }
       }
 
-      // 결과를 Recipe 타입으로 변환
-      const recipes: Recipe[] = data.results.map((page: NotionPage) => {
-        const p = page.properties;
-        const blogPostContent = p.blogPost?.rich_text
-          ? p.blogPost.rich_text
-              .map((rt: NotionRichText) => rt.plain_text)
-              .join("")
-          : "";
-
-        const description =
-          p.description?.rich_text?.[0]?.plain_text ||
-          p.metaDescription?.rich_text?.[0]?.plain_text ||
-          "";
-
-        // 이미지 추출 최적화
-        let featuredImage: string | undefined = undefined;
-
-        // 1. featuredImage 속성 확인
-        const fImg = p.featuredImage as
-          | {
-              type: "files";
-              files: Array<{
-                type: "external" | "file";
-                external?: { url: string };
-                file?: { url: string };
-              }>;
-            }
-          | { type: "url"; url: string }
-          | undefined;
-        if (fImg) {
-          if (fImg.type === "files" && fImg.files && fImg.files.length > 0) {
-            const file = fImg.files[0];
-            featuredImage =
-              file.type === "external" ? file.external?.url : file.file?.url;
-          } else if (fImg.type === "url" && fImg.url) {
-            featuredImage = fImg.url;
-          }
-        }
-
-        // 2. image 속성 확인
-        if (!featuredImage) {
-          const img = p.image as
-            | {
-                type: "files";
-                files: Array<{
-                  type: "external" | "file";
-                  external?: { url: string };
-                  file?: { url: string };
-                }>;
-              }
-            | { type: "url"; url: string }
-            | undefined;
-          if (img && typeof img === "object") {
-            if (
-              "files" in img &&
-              Array.isArray(img.files) &&
-              img.files.length > 0
-            ) {
-              const file = img.files[0];
-              featuredImage =
-                file.type === "external" ? file.external?.url : file.file?.url;
-            } else if ("url" in img && typeof img.url === "string") {
-              featuredImage = img.url;
-            }
-          }
-        }
-
-        // 3. blogPost 필드에서만 이미지 추출
-        if (!featuredImage) {
-          featuredImage = extractFirstImageUrl(blogPostContent);
-        }
-
-        const difficulty = p.difficulty?.select?.name || undefined;
-        const cookingTime =
-          typeof p.cookingtime === "number" ? p.cookingtime : undefined;
-        const servingSize =
-          typeof p.servingsize === "number" ? p.servingsize : undefined;
-
-        return {
-          id: page.id,
-          title: p.title?.title?.[0]?.plain_text || "Untitled",
-          slug: p.slug?.rich_text?.[0]?.plain_text || "",
-          description,
-          metaDescription:
-            p.metaDescription?.rich_text?.[0]?.plain_text || description,
-          published: true,
-          blogPost: blogPostContent,
-          date: p.date?.date?.start || undefined,
-          tags:
-            p.tags?.multi_select?.map((tag: { name: string }) => tag.name) ||
-            [],
-          difficulty,
-          cookingTime,
-          servingSize,
-          featuredImage,
-          category: p.category?.rich_text?.[0]?.plain_text,
-          products:
-            p.products?.multi_select?.map(
-              (product: { name: string }) => product.name,
-            ) || undefined,
-          prompt: p.prompt?.rich_text?.[0]?.plain_text || undefined,
-        };
-      });
+      const recipes: Recipe[] = data.results.map((page: NotionPage) =>
+        mapNotionPageToRecipe(page),
+      );
 
       allRecipes = [...allRecipes, ...recipes];
 
@@ -1147,111 +1056,7 @@ export async function getRecipeBySlug(slug: string): Promise<Recipe | null> {
     }
 
     const page: NotionPage = data.results[0];
-
-    // published 속성 확인 (소문자 우선)
-    const publishedValue = (page.properties.published ||
-      page.properties.Published) as { checkbox?: boolean } | undefined;
-    const isPublished = publishedValue?.checkbox ?? true;
-
-    // description 또는 metaDescription 사용
-    const description =
-      page.properties.description?.rich_text?.[0]?.plain_text ||
-      page.properties.metaDescription?.rich_text?.[0]?.plain_text ||
-      "";
-
-    // blogPost 추출
-    const blogPostContent = page.properties.blogPost?.rich_text
-      ? page.properties.blogPost.rich_text
-          .map((rt: NotionRichText) => rt.plain_text)
-          .join("")
-      : "";
-
-    // image 속성에서 이미지 URL 추출
-    let imageUrl: string | undefined = undefined;
-    if (
-      page.properties.image &&
-      typeof page.properties.image === "object" &&
-      page.properties.image !== null &&
-      "files" in page.properties.image &&
-      Array.isArray(page.properties.image.files)
-    ) {
-      const imageFile = page.properties.image.files[0];
-      if (imageFile?.file?.url) {
-        imageUrl = imageFile.file.url;
-      }
-    } else if (
-      page.properties.image &&
-      typeof page.properties.image === "object" &&
-      page.properties.image !== null &&
-      "url" in page.properties.image &&
-      typeof page.properties.image.url === "string"
-    ) {
-      imageUrl = page.properties.image.url;
-    }
-
-    // difficulty 추출
-    const difficulty = page.properties.difficulty?.select?.name || undefined;
-
-    // cookingtime 추출
-    let cookingTime: string | number | undefined = undefined;
-    if (
-      page.properties.cookingtime &&
-      typeof page.properties.cookingtime === "object" &&
-      page.properties.cookingtime !== null
-    ) {
-      if (
-        "rich_text" in page.properties.cookingtime &&
-        Array.isArray(page.properties.cookingtime.rich_text) &&
-        page.properties.cookingtime.rich_text?.[0]?.plain_text
-      ) {
-        cookingTime = page.properties.cookingtime.rich_text[0].plain_text;
-      } else if (
-        "number" in page.properties.cookingtime &&
-        typeof page.properties.cookingtime.number === "number"
-      ) {
-        cookingTime = page.properties.cookingtime.number;
-      }
-    }
-
-    // servingsize 추출
-    let servingSize: number | undefined = undefined;
-    if (
-      page.properties.servingsize &&
-      typeof page.properties.servingsize === "object" &&
-      page.properties.servingsize !== null
-    ) {
-      if (
-        "number" in page.properties.servingsize &&
-        typeof page.properties.servingsize.number === "number"
-      ) {
-        servingSize = page.properties.servingsize.number;
-      }
-    }
-
-    const recipe = {
-      id: page.id,
-      title: page.properties.title?.title[0]?.plain_text || "Untitled",
-      slug: page.properties.slug?.rich_text?.[0]?.plain_text || "",
-      metaDescription: description,
-      description: description,
-      published: isPublished,
-      blogPost: blogPostContent || undefined,
-      difficulty,
-      cookingTime,
-      servingSize,
-      category:
-        page.properties.category?.rich_text?.[0]?.plain_text || undefined,
-      products:
-        page.properties.products?.multi_select?.map(
-          (product: { name: string }) => product.name,
-        ) || undefined,
-      prompt: page.properties.prompt?.rich_text?.[0]?.plain_text || undefined,
-      date: page.properties.date?.date?.start || undefined,
-      tags:
-        page.properties.tags?.multi_select?.map((tag) => tag.name) || undefined,
-      featuredImage: imageUrl,
-      image: imageUrl,
-    };
+    const recipe = mapNotionPageToRecipe(page);
 
     cache.set(cacheKey, recipe, 60000);
     return recipe;
