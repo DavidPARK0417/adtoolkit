@@ -263,9 +263,22 @@ export default function TagCopySection({
       // 2. 본문 내용 가공 (Dom Clone을 이용한 이미지 데이터 객체화)
       const contentClone = contentRef.current.cloneNode(true) as HTMLDivElement;
 
-      // 사용자 요청: 보이지 않는 canvas 엘리먼트를 생성해서 이미지를 그린 뒤,
-      // canvas.toDataURL('image/jpeg')를 통해 표준 JPEG 데이터로 뽑아서 복사
-      let clipboardImageBlob: Blob | null = null;
+      // 이미지출처 텍스트를 포함하는 요소 제거 (DOM 직접 조작)
+      // < 이미지 출처 : ... > 또는 < 이미지출처 : ... > 형식의 텍스트를 포함하는 요소를 제거
+      const allElements = Array.from(
+        contentClone.querySelectorAll("div, p, span"),
+      );
+      for (const el of allElements) {
+        const text = el.textContent || "";
+        if (
+          /[<＜]\s*이미지\s*출처\s*[:\uff1a]/i.test(text) &&
+          el.children.length === 0
+        ) {
+          el.parentElement?.removeChild(el);
+        }
+      }
+
+      // Canvas로 이미지를 JPEG Base64로 변환하여 HTML에 코딩 (티스토리 호환성)
       const images = Array.from(contentClone.querySelectorAll("img"));
 
       for (const img of images) {
@@ -325,17 +338,11 @@ export default function TagCopySection({
             // 티스토리 호환 JPEG Base64 치환 (품질 0.75로 낮추어 용량 압축)
             const dataUrl = canvas.toDataURL("image/jpeg", 0.75);
             img.setAttribute("src", dataUrl);
-
-            // 첫 번째 이미지는 클립보드 Mime(객체) 복사용 Blob으로 추출
-            if (!clipboardImageBlob) {
-              clipboardImageBlob = await new Promise<Blob | null>((res) => {
-                // 클립보드 API는 image/png 만 허용할 경우가 많으므로 png 반환
-                canvas.toBlob((blob) => res(blob), "image/png");
-              });
-            }
           }
         } catch (err) {
-          console.error("Canvas 이미지 변환 실패:", err);
+          // CORS/SecurityError 등의 이유로 Canvas 변환 실패 - 조용히 fallback 진행
+          const errMsg = err instanceof Error ? err.message : "알 수 없는 오류";
+          console.warn("Canvas 이미지 변환 실패 (fallback 진행):", errMsg);
           // 실패 시 최후의 수단: 원본 도메인 절대 경로 치환 + jpg 확장자 눈속임
           let originalUrl = srcUrl;
           if (srcUrl.includes("/api/proxy-image")) {
@@ -480,6 +487,18 @@ export default function TagCopySection({
             : pStyle;
           return `<p style="${finalPStyle}">${content}</p>`;
         },
+      );
+
+      // 이미지 출처 텍스트 제거 (< 이미지 출처 : ... > 또는 < 이미지출처 : ... > 형식)
+      // 해당 텍스트를 포함하는 p, div, span 등 블록/인라인 요소 전체를 제거
+      bodyHtml = bodyHtml.replace(
+        /<[a-z][^>]*>[^<]*<\s*이미지\s*출처\s*[:：][^>]+>[^<]*<\/[a-z]+>/gi,
+        "",
+      );
+      // 요소 내부에 이미지출처 텍스트가 있는 경우도 제거
+      bodyHtml = bodyHtml.replace(
+        /<[^>]+>[^<]*<\s*이미지\s*출처[^>]*>[^<]*<\/[^>]+>/gi,
+        "",
       );
 
       // 이미지 스타일
@@ -638,14 +657,17 @@ export default function TagCopySection({
       const blobHtml = new Blob([combinedHtml], { type: "text/html" });
       const blobText = new Blob([plainTextCombined], { type: "text/plain" });
 
+      // image/png는 긴 비동기 처리로 인한 document focus 손실 문제를 야기하므로 제외
+      // HTML과 텍스트 형식만으로도 티스토리 붙여넣기에 충분함
       const data: ClipboardItem[] = [
         new ClipboardItem({
           "text/html": blobHtml,
           "text/plain": blobText,
-          ...(clipboardImageBlob && { "image/png": clipboardImageBlob }),
         }),
       ];
 
+      // 복사 직전 focus 복원 (비동기 처리 중 document focus를 잃는 문제 방지)
+      window.focus();
       // iOS Safari 등 일부 모바일 브라우저 대응을 위해 navigator.clipboard.write 사용
       if (navigator.clipboard && navigator.clipboard.write) {
         await navigator.clipboard.write(data);
@@ -656,11 +678,13 @@ export default function TagCopySection({
       setActiveButton("htmlT");
       window.setTimeout(() => setActiveButton(null), 2000);
     } catch (err) {
-      console.error("티스토리 본문 복사 실패:", err);
+      const errMsg = err instanceof Error ? err.message : String(err);
+      console.error("티스토리 본문 복사 실패:", errMsg);
       // 모바일 등에서 ClipboardItem 미지원 시 텍스트만이라도 복사 시도
       if (!plainTextCombined) {
         plainTextCombined = `${descriptionRef.current?.innerText || ""}\n\n${contentRef.current?.innerText || ""}`;
       }
+      window.focus();
       void copyToClipboard(plainTextCombined, "htmlT");
     }
   };
@@ -687,6 +711,20 @@ export default function TagCopySection({
       const contentCloneN = contentRef.current.cloneNode(
         true,
       ) as HTMLDivElement;
+
+      // 이미지출처 텍스트를 포함하는 요소 제거 (DOM 직접 조작)
+      const allElementsN = Array.from(
+        contentCloneN.querySelectorAll("div, p, span"),
+      );
+      for (const el of allElementsN) {
+        const text = el.textContent || "";
+        if (
+          /[<＜]\s*이미지\s*출처\s*[:\uff1a]/i.test(text) &&
+          el.children.length === 0
+        ) {
+          el.parentElement?.removeChild(el);
+        }
+      }
 
       // ──────────────────────────────────────────────────
       // ⭐ [근본 해결책] 네이버 블로그 이미지 영구 URL 처리
@@ -885,6 +923,16 @@ export default function TagCopySection({
             : pStyle;
           return `<p style="${finalPStyle}">${content}</p>`;
         },
+      );
+
+      // 이미지 출처 텍스트 제거 (< 이미지 출처 : ... > 또는 < 이미지출처 : ... > 형식)
+      bodyHtml = bodyHtml.replace(
+        /<[a-z][^>]*>[^<]*<\s*이미지\s*출처\s*[:：][^>]+>[^<]*<\/[a-z]+>/gi,
+        "",
+      );
+      bodyHtml = bodyHtml.replace(
+        /<[^>]+>[^<]*<\s*이미지\s*출처[^>]*>[^<]*<\/[^>]+>/gi,
+        "",
       );
 
       // 이미지 스타일 (네이버 에디터 대응: 중앙 정렬 강조)
