@@ -863,30 +863,22 @@ export async function getLatestRecipes(limit: number = 3): Promise<Recipe[]> {
 
     const recipesWithImagesPromises = recipesWithoutImages.map(
       async (recipe) => {
-        // 이미 이미지가 있으면 스킵
-        if (recipe.featuredImage) {
-          console.log(
-            `[getLatestRecipes] ${recipe.title} already has featuredImage: ${recipe.featuredImage}`,
-          );
-          return recipe;
-        }
-
         try {
-          console.log(
-            `[getLatestRecipes] fetching full content for ${recipe.title}...`,
-          );
+          // Notion DB 속성의 file.url은 약 1시간 후 만료되는 S3 서명 URL이므로
+          // 항상 getRecipeContent()로 실시간 이미지 URL을 추출합니다.
           const fullContent = await getRecipeContent(recipe.id);
           const featuredImage = extractFirstImageUrl(fullContent);
-          console.log(
-            `[getLatestRecipes] ${recipe.title} extracting image from content: ${featuredImage}`,
-          );
-          return { ...recipe, featuredImage, image: featuredImage };
+          if (featuredImage) {
+            return { ...recipe, featuredImage, image: featuredImage };
+          }
+          // 본문에서 이미지를 찾지 못한 경우에만 DB 속성 URL 사용 (fallback)
+          return recipe;
         } catch (error) {
           console.error(
             `[getLatestRecipes] Failed to extract image for ${recipe.title}:`,
             error,
           );
-          // 이미지 추출 실패는 무시
+          // 이미지 추출 실패 시 DB 속성 URL을 fallback으로 사용
           return recipe;
         }
       },
